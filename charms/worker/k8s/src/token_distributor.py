@@ -214,6 +214,16 @@ class TokenManager:
         relation.data[charm.app][secret_key] = secret.id
         secret.grant(relation, unit=unit)
 
+        # Security audit logging
+        # Note: secret.id is the secret ID (reference), not the actual secret value
+        log.info(
+            "SECURITY: Granted %s token [secret_id=%s, target_unit=%s, relation=%s]",
+            self.strategy.name.lower(),
+            secret.id,
+            unit.name,
+            relation.name,
+        )
+
     def revoke(self, relation: ops.Relation, charm: ops.CharmBase, unit: ops.Unit) -> None:
         """Revoke a secret offered to a unit on this relation.
 
@@ -236,6 +246,16 @@ class TokenManager:
         if juju_secret := (by_app or by_unit):
             secret = charm.model.get_secret(id=juju_secret)
             secret.remove_all_revisions()
+
+            # Security audit logging
+            # Note: juju_secret is the secret ID (reference), not the actual secret value
+            log.info(
+                "SECURITY: Revoked %s token [secret_id=%s, unit=%s, relation=%s]",
+                self.strategy.name.lower(),
+                juju_secret,
+                unit.name,
+                relation.name,
+            )
 
     def get_juju_secret(
         self, relation: ops.Relation, charm: ops.CharmBase, unit: ops.Unit
@@ -285,7 +305,16 @@ class ClusterTokenManager(TokenManager):
             SecretStr: The created cluster token.
         """
         worker = token_type == ClusterTokenType.WORKER
-        return self.api_manager.create_join_token(name, worker=worker)
+        token = self.api_manager.create_join_token(name, worker=worker)
+
+        # Security audit logging
+        log.info(
+            "SECURITY: Created %s join token [node=%s, token_type=%s]",
+            self.strategy.name.lower(),
+            name,
+            token_type.value or "control-plane",
+        )
+        return token
 
     def remove(self, name: str, secret: Optional[ops.Secret], ignore_errors: bool):
         """Remove a cluster token.
@@ -299,7 +328,19 @@ class ClusterTokenManager(TokenManager):
             K8sdConnectionError: reraises cluster token remove failures
         """
         try:
+            # Security audit logging
+            log.info(
+                "SECURITY: Node removal initiated [node=%s, force=%s, strategy=%s]",
+                name,
+                ignore_errors,
+                self.strategy.name.lower(),
+            )
             self.api_manager.remove_node(name, force=ignore_errors)
+            log.info(
+                "SECURITY: Node removal completed [node=%s, strategy=%s]",
+                name,
+                self.strategy.name.lower(),
+            )
         except (K8sdConnectionError, InvalidResponseError) as e:
             if ignore_errors or getattr(e, "code") == ErrorCodes.STATUS_NODE_UNAVAILABLE:
                 # Let's just ignore some of these expected errors:
@@ -308,6 +349,12 @@ class ClusterTokenManager(TokenManager):
                 # Removing a node that doesn't exist
                 log.warning("Remove_Node %s: but with an expected error: %s", name, e)
             else:
+                log.error(
+                    "SECURITY: Node removal failed [node=%s, error=%s, strategy=%s]",
+                    name,
+                    str(e),
+                    self.strategy.name.lower(),
+                )
                 raise
 
 
@@ -329,9 +376,18 @@ class CosTokenManager(TokenManager):
             SecretStr: The created COS token.
         """
         # pylint: disable=unused-argument
-        return self.api_manager.request_auth_token(
-            username=f"system:cos:{name}", groups=["system:cos"]
+        username = f"system:cos:{name}"
+        token = self.api_manager.request_auth_token(username=username, groups=["system:cos"])
+
+        # Security audit logging
+        log.info(
+            "SECURITY: Created %s token [node=%s, username=%s, groups=%s]",
+            self.strategy.name.lower(),
+            name,
+            username,
+            "system:cos",
         )
+        return token
 
     def remove(self, name: str, secret: Optional[ops.Secret], ignore_errors: bool):
         """Remove a COS token intentionally left unimplemented.
@@ -349,7 +405,18 @@ class CosTokenManager(TokenManager):
             return
         content = TokenContent.load_from_secret(secret)
         try:
+            # Security audit logging
+            log.info(
+                "SECURITY: Auth token revocation initiated [node=%s, strategy=%s]",
+                name,
+                self.strategy.name.lower(),
+            )
             self.api_manager.revoke_auth_token(content.token.get_secret_value())
+            log.info(
+                "SECURITY: Auth token revoked [node=%s, strategy=%s]",
+                name,
+                self.strategy.name.lower(),
+            )
         except (K8sdConnectionError, InvalidResponseError) as e:
             if ignore_errors or getattr(e, "code") == ErrorCodes.STATUS_NODE_UNAVAILABLE:
                 # Let's just ignore some of these expected errors:
@@ -358,6 +425,12 @@ class CosTokenManager(TokenManager):
                 # Removing a node that doesn't exist
                 log.warning("Revoke_Auth_Token %s: but with an expected error: %s", name, e)
             else:
+                log.error(
+                    "SECURITY: Auth token revocation failed [node=%s, error=%s, strategy=%s]",
+                    name,
+                    str(e),
+                    self.strategy.name.lower(),
+                )
                 raise
 
 
@@ -466,10 +539,30 @@ class TokenCollector:
             # Notify the leader that this token failed
             token_failure = TokenFailure(revision=content.revision, error=str(e))
             _set_token_failure(relation, self.charm.unit, token_failure)
+
+            # Security audit logging
+            log.error(
+                "SECURITY: Token consumption failed "
+                "[node=%s, token_revision=%s, relation=%s, error=%s]",
+                self.node_name,
+                content.revision,
+                relation.name,
+                str(e),
+            )
             raise e
 
         # signal that the relation is joined, the token is used
-        self.cluster_name(relation, True)
+        cluster_name = self.cluster_name(relation, True)
+
+        # Security audit logging
+        log.info(
+            "SECURITY: Token consumed for node join "
+            "[node=%s, token_revision=%s, cluster=%s, relation=%s]",
+            self.node_name,
+            content.revision,
+            cluster_name,
+            relation.name,
+        )
 
 
 class TokenDistributor:
@@ -629,6 +722,20 @@ class TokenDistributor:
                         unit.name,
                         node,
                     )
+
+                    # Security audit logging
+                    log.warning(
+                        "SECURITY: Token failure detected "
+                        "[node=%s, unit=%s, relation=%s, strategy=%s, "
+                        "token_revision=%s, error=%s]",
+                        node,
+                        unit.name,
+                        relation.name,
+                        token_strategy.name.lower(),
+                        failure.revision,
+                        failure.error,
+                    )
+
                     # Prevent secret revision leakage
                     secret.remove_revision(secret.get_info().revision)
                 else:
@@ -654,11 +761,35 @@ class TokenDistributor:
             if not secret:
                 content = TokenContent(token=token, revision=0)
                 secret = relation.app.add_secret(content.model_dump())
+
+                # Security audit logging
+                log.info(
+                    "SECURITY: Token secret created "
+                    "[node=%s, unit=%s, relation=%s, strategy=%s, token_type=%s, revision=%s]",
+                    node,
+                    unit.name,
+                    relation.name,
+                    token_strategy.name.lower(),
+                    token_type.value or "control-plane",
+                    0,
+                )
             else:
                 content = TokenContent.load_from_secret(secret)
                 content.token = token
                 content.revision += 1
                 secret.set_content(content.model_dump())
+
+                # Security audit logging
+                log.info(
+                    "SECURITY: Token secret updated "
+                    "[node=%s, unit=%s, relation=%s, strategy=%s, token_type=%s, revision=%s]",
+                    node,
+                    unit.name,
+                    relation.name,
+                    token_strategy.name.lower(),
+                    token_type.value or "control-plane",
+                    content.revision,
+                )
             tokenizer.grant(relation, self.charm, unit, secret)
             self.update_node(relation, unit, f"pending-{node}")
 

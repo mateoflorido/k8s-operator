@@ -75,9 +75,26 @@ def configure(charm: K8sCharmProtocol):
 
     for request in charm.kube_control.auth_requests:
         log.info("Signing kube-control request for '%s 'in '%s'", request.user, request.group)
+
+        # Security audit logging
+        log.info(
+            "SECURITY: Auth token requested [user=%s, groups=%s, requester_unit=%s]",
+            request.user,
+            request.group,
+            request.unit,
+        )
+
         client_token = charm.api_manager.request_auth_token(
             username=request.user, groups=[request.group]
         )
+
+        # Security audit logging
+        log.info(
+            "SECURITY: Auth token signed [user=%s, groups=%s]",
+            request.user,
+            request.group,
+        )
+
         charm.kube_control.sign_auth_request(
             request,
             client_token=client_token.get_secret_value(),
@@ -87,4 +104,17 @@ def configure(charm: K8sCharmProtocol):
 
     for user, cred in charm.kube_control.closed_auth_creds():
         log.info("Revoke auth-token for '%s'", user)
+
+        # Security audit logging
+        log.info(
+            "SECURITY: Auth token revocation requested [user=%s, reason=relation_departed]",
+            user,
+        )
+
         charm.api_manager.revoke_auth_token(cred.load_client_token(charm.model, user))
+
+        # Security audit logging
+        log.info(
+            "SECURITY: Auth token revoked [user=%s]",
+            user,
+        )
