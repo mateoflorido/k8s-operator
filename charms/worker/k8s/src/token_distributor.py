@@ -310,7 +310,7 @@ class ClusterTokenManager(TokenManager):
             "SECURITY: Created %s join token [node=%s, token_type=%s]",
             self.strategy.name.lower(),
             name,
-            token_type.value if token_type.value else "control-plane",
+            token_type.value or "control-plane",
         )
         return token
 
@@ -768,7 +768,7 @@ class TokenDistributor:
                     unit.name,
                     relation.name,
                     token_strategy.name.lower(),
-                    token_type.value if token_type.value else "control-plane",
+                    token_type.value or "control-plane",
                     0,
                 )
             else:
@@ -785,7 +785,7 @@ class TokenDistributor:
                     unit.name,
                     relation.name,
                     token_strategy.name.lower(),
-                    token_type.value if token_type.value else "control-plane",
+                    token_type.value or "control-plane",
                     content.revision,
                 )
             tokenizer.grant(relation, self.charm, unit, secret)
