@@ -542,23 +542,24 @@ class K8sCharm(ops.CharmBase):
         node_name = self.get_node_name()
         cluster_name = self.get_cluster_name()
         datastore_type = self.bootstrap.config.datastore
-        
+
         # Security audit logging
         log.info(
-            "SECURITY: Cluster bootstrap initiated [node=%s, cluster_name=%s, datastore=%s, address=%s, initiator=leader]",
+            "SECURITY: Cluster bootstrap initiated "
+            "[node=%s, cluster_name=%s, datastore=%s, address=%s, initiator=leader]",
             node_name,
             cluster_name,
             datastore_type,
             node_ips[0],
         )
-        
+
         payload = CreateClusterRequest(
             name=node_name,
             address=f"{node_ips[0]}:{K8SD_PORT}",
             config=self._assemble_bootstrap_config(),
         )
         self.api_manager.bootstrap_k8s_snap(payload)
-        
+
         # Security audit logging
         log.info(
             "SECURITY: Cluster bootstrap completed [node=%s, cluster_name=%s]",
@@ -932,9 +933,9 @@ class K8sCharm(ops.CharmBase):
         node_name = self.get_node_name()
         cluster_addr = f"{node_ips[0]}:{K8SD_PORT}"
         node_type = "worker" if self.is_worker else "control-plane"
-        
+
         log.info("Joining %s(%s) to %s...", self.unit, node_name, cluster_name)
-        
+
         # Security audit logging
         log.info(
             "SECURITY: Node join initiated [node=%s, cluster=%s, node_type=%s, address=%s]",
@@ -943,7 +944,7 @@ class K8sCharm(ops.CharmBase):
             node_type,
             node_ips[0],
         )
-        
+
         request = JoinClusterRequest(name=node_name, address=cluster_addr, token=SecretStr(token))
         if self.is_control_plane:
             request.config = ControlPlaneNodeJoinConfig()
@@ -960,7 +961,7 @@ class K8sCharm(ops.CharmBase):
         try:
             self.api_manager.join_cluster(request)
             log.info("Joined %s(%s)", self.unit, node_name)
-            
+
             # Security audit logging
             log.info(
                 "SECURITY: Node join completed [node=%s, cluster=%s, node_type=%s]",

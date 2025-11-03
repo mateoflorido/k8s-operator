@@ -213,7 +213,7 @@ class TokenManager:
         relation.data[charm.unit].pop(secret_key, None)
         relation.data[charm.app][secret_key] = secret.id
         secret.grant(relation, unit=unit)
-        
+
         # Security audit logging
         log.info(
             "SECURITY: Granted %s token [secret_id=%s, target_unit=%s, relation=%s]",
@@ -245,7 +245,7 @@ class TokenManager:
         if juju_secret := (by_app or by_unit):
             secret = charm.model.get_secret(id=juju_secret)
             secret.remove_all_revisions()
-            
+
             # Security audit logging
             log.info(
                 "SECURITY: Revoked %s token [secret_id=%s, unit=%s, relation=%s]",
@@ -304,7 +304,7 @@ class ClusterTokenManager(TokenManager):
         """
         worker = token_type == ClusterTokenType.WORKER
         token = self.api_manager.create_join_token(name, worker=worker)
-        
+
         # Security audit logging
         log.info(
             "SECURITY: Created %s join token [node=%s, token_type=%s]",
@@ -376,7 +376,7 @@ class CosTokenManager(TokenManager):
         # pylint: disable=unused-argument
         username = f"system:cos:{name}"
         token = self.api_manager.request_auth_token(username=username, groups=["system:cos"])
-        
+
         # Security audit logging
         log.info(
             "SECURITY: Created %s token [node=%s, username=%s, groups=%s]",
@@ -537,10 +537,11 @@ class TokenCollector:
             # Notify the leader that this token failed
             token_failure = TokenFailure(revision=content.revision, error=str(e))
             _set_token_failure(relation, self.charm.unit, token_failure)
-            
+
             # Security audit logging
             log.error(
-                "SECURITY: Token consumption failed [node=%s, token_revision=%s, relation=%s, error=%s]",
+                "SECURITY: Token consumption failed "
+                "[node=%s, token_revision=%s, relation=%s, error=%s]",
                 self.node_name,
                 content.revision,
                 relation.name,
@@ -550,10 +551,11 @@ class TokenCollector:
 
         # signal that the relation is joined, the token is used
         cluster_name = self.cluster_name(relation, True)
-        
+
         # Security audit logging
         log.info(
-            "SECURITY: Token consumed for node join [node=%s, token_revision=%s, cluster=%s, relation=%s]",
+            "SECURITY: Token consumed for node join "
+            "[node=%s, token_revision=%s, cluster=%s, relation=%s]",
             self.node_name,
             content.revision,
             cluster_name,
@@ -718,10 +720,12 @@ class TokenDistributor:
                         unit.name,
                         node,
                     )
-                    
+
                     # Security audit logging
                     log.warning(
-                        "SECURITY: Token failure detected [node=%s, unit=%s, relation=%s, strategy=%s, token_revision=%s, error=%s]",
+                        "SECURITY: Token failure detected "
+                        "[node=%s, unit=%s, relation=%s, strategy=%s, "
+                        "token_revision=%s, error=%s]",
                         node,
                         unit.name,
                         relation.name,
@@ -729,7 +733,7 @@ class TokenDistributor:
                         failure.revision,
                         failure.error,
                     )
-                    
+
                     # Prevent secret revision leakage
                     secret.remove_revision(secret.get_info().revision)
                 else:
@@ -755,10 +759,11 @@ class TokenDistributor:
             if not secret:
                 content = TokenContent(token=token, revision=0)
                 secret = relation.app.add_secret(content.model_dump())
-                
+
                 # Security audit logging
                 log.info(
-                    "SECURITY: Token secret created [node=%s, unit=%s, relation=%s, strategy=%s, token_type=%s, revision=%s]",
+                    "SECURITY: Token secret created "
+                    "[node=%s, unit=%s, relation=%s, strategy=%s, token_type=%s, revision=%s]",
                     node,
                     unit.name,
                     relation.name,
@@ -771,10 +776,11 @@ class TokenDistributor:
                 content.token = token
                 content.revision += 1
                 secret.set_content(content.model_dump())
-                
+
                 # Security audit logging
                 log.info(
-                    "SECURITY: Token secret updated [node=%s, unit=%s, relation=%s, strategy=%s, token_type=%s, revision=%s]",
+                    "SECURITY: Token secret updated "
+                    "[node=%s, unit=%s, relation=%s, strategy=%s, token_type=%s, revision=%s]",
                     node,
                     unit.name,
                     relation.name,

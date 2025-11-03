@@ -32,7 +32,10 @@ def test_token_grant_security_logging(caplog):
     manager.grant(relation, charm, unit, secret)
 
     # Verify security log entry
-    assert "SECURITY: Granted cluster token [secret_id=secret-id-123, target_unit=k8s/0, relation=cluster]" in caplog.text
+    assert (
+        "SECURITY: Granted cluster token "
+        "[secret_id=secret-id-123, target_unit=k8s/0, relation=cluster]" in caplog.text
+    )
 
 
 def test_token_revoke_security_logging(caplog):
@@ -56,7 +59,10 @@ def test_token_revoke_security_logging(caplog):
     manager.revoke(relation, charm, unit)
 
     # Verify security log entry
-    assert "SECURITY: Revoked cluster token [secret_id=secret-id-456, unit=k8s/0, relation=cluster]" in caplog.text
+    assert (
+        "SECURITY: Revoked cluster token [secret_id=secret-id-456, unit=k8s/0, relation=cluster]"
+        in caplog.text
+    )
     secret.remove_all_revisions.assert_called_once_with()
 
 
@@ -73,7 +79,9 @@ def test_cluster_token_create_security_logging(caplog):
     manager.create("test-node", token_distributor.ClusterTokenType.WORKER)
 
     # Verify security log entry
-    assert "SECURITY: Created cluster join token [node=test-node, token_type=worker]" in caplog.text
+    assert (
+        "SECURITY: Created cluster join token [node=test-node, token_type=worker]" in caplog.text
+    )
 
 
 def test_cluster_token_create_control_plane_security_logging(caplog):
@@ -89,7 +97,10 @@ def test_cluster_token_create_control_plane_security_logging(caplog):
     manager.create("test-node", token_distributor.ClusterTokenType.CONTROL_PLANE)
 
     # Verify security log entry
-    assert "SECURITY: Created cluster join token [node=test-node, token_type=control-plane]" in caplog.text
+    assert (
+        "SECURITY: Created cluster join token [node=test-node, token_type=control-plane]"
+        in caplog.text
+    )
 
 
 def test_cos_token_create_security_logging(caplog):
@@ -105,7 +116,10 @@ def test_cos_token_create_security_logging(caplog):
     manager.create("test-node", token_distributor.ClusterTokenType.NONE)
 
     # Verify security log entry
-    assert "SECURITY: Created cos token [node=test-node, username=system:cos:test-node, groups=system:cos]" in caplog.text
+    assert (
+        "SECURITY: Created cos token "
+        "[node=test-node, username=system:cos:test-node, groups=system:cos]" in caplog.text
+    )
 
 
 def test_node_removal_security_logging(caplog):
@@ -120,7 +134,10 @@ def test_node_removal_security_logging(caplog):
     manager.remove("test-node", None, False)
 
     # Verify security log entries
-    assert "SECURITY: Node removal initiated [node=test-node, force=False, strategy=cluster]" in caplog.text
+    assert (
+        "SECURITY: Node removal initiated [node=test-node, force=False, strategy=cluster]"
+        in caplog.text
+    )
     assert "SECURITY: Node removal completed [node=test-node, strategy=cluster]" in caplog.text
 
 
@@ -138,7 +155,10 @@ def test_node_removal_failure_security_logging(caplog):
         manager.remove("test-node", None, False)
 
     # Verify security log entry for failure
-    assert "SECURITY: Node removal failed [node=test-node, error=Connection failed, strategy=cluster]" in caplog.text
+    assert (
+        "SECURITY: Node removal failed [node=test-node, error=Connection failed, strategy=cluster]"
+        in caplog.text
+    )
 
 
 def test_cos_auth_token_revocation_security_logging(caplog):
@@ -156,7 +176,9 @@ def test_cos_auth_token_revocation_security_logging(caplog):
     manager.remove("test-node", secret, False)
 
     # Verify security log entries
-    assert "SECURITY: Auth token revocation initiated [node=test-node, strategy=cos]" in caplog.text
+    assert (
+        "SECURITY: Auth token revocation initiated [node=test-node, strategy=cos]" in caplog.text
+    )
     assert "SECURITY: Auth token revoked [node=test-node, strategy=cos]" in caplog.text
 
 
@@ -186,7 +208,9 @@ def test_token_consumption_success_security_logging(harness, caplog):
     harness.disable_hooks()
     collector = token_distributor.TokenCollector(harness.charm, "my-node")
 
-    relation_id = harness.add_relation("cluster", "remote", unit_data={"cluster-name": "test-cluster"})
+    relation_id = harness.add_relation(
+        "cluster", "remote", unit_data={"cluster-name": "test-cluster"}
+    )
     relation = harness.charm.model.get_relation(CLUSTER_RELATION)
 
     # Set up a secret
@@ -201,7 +225,10 @@ def test_token_consumption_success_security_logging(harness, caplog):
         assert token == "test-token"
 
     # Verify security log entry
-    assert "SECURITY: Token consumed for node join [node=my-node, token_revision=0, cluster=test-cluster, relation=cluster]" in caplog.text
+    assert (
+        "SECURITY: Token consumed for node join "
+        "[node=my-node, token_revision=0, cluster=test-cluster, relation=cluster]" in caplog.text
+    )
 
 
 def test_token_consumption_failure_security_logging(harness, caplog):
@@ -227,7 +254,10 @@ def test_token_consumption_failure_security_logging(harness, caplog):
         pass
 
     # Verify security log entry
-    assert "SECURITY: Token consumption failed [node=my-node, token_revision=0, relation=cluster, error=Join failed]" in caplog.text
+    assert (
+        "SECURITY: Token consumption failed "
+        "[node=my-node, token_revision=0, relation=cluster, error=Join failed]" in caplog.text
+    )
 
 
 def test_token_failure_detected_security_logging(caplog):
@@ -279,4 +309,8 @@ def test_token_failure_detected_security_logging(caplog):
     )
 
     # Verify security log entry
-    assert "SECURITY: Token failure detected [node=remote-node, unit=k8s/1, relation=cluster, strategy=cluster, token_revision=1, error=Connection timeout]" in caplog.text
+    assert (
+        "SECURITY: Token failure detected "
+        "[node=remote-node, unit=k8s/1, relation=cluster, strategy=cluster, "
+        "token_revision=1, error=Connection timeout]" in caplog.text
+    )
