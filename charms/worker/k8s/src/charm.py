@@ -539,12 +539,32 @@ class K8sCharm(ops.CharmBase):
             raise ReconcilerError("No node IPs found")
 
         status.add(ops.MaintenanceStatus("Bootstrapping Cluster"))
+        node_name = self.get_node_name()
+        cluster_name = self.get_cluster_name()
+        datastore_type = self.bootstrap.config.datastore
+        
+        # Security audit logging
+        log.info(
+            "SECURITY: Cluster bootstrap initiated [node=%s, cluster_name=%s, datastore=%s, address=%s, initiator=leader]",
+            node_name,
+            cluster_name,
+            datastore_type,
+            node_ips[0],
+        )
+        
         payload = CreateClusterRequest(
-            name=self.get_node_name(),
+            name=node_name,
             address=f"{node_ips[0]}:{K8SD_PORT}",
             config=self._assemble_bootstrap_config(),
         )
         self.api_manager.bootstrap_k8s_snap(payload)
+        
+        # Security audit logging
+        log.info(
+            "SECURITY: Cluster bootstrap completed [node=%s, cluster_name=%s]",
+            node_name,
+            cluster_name,
+        )
 
     @on_error(
         ops.BlockedStatus("Failed to apply containerd_custom_registries, check logs for details"),
@@ -911,7 +931,19 @@ class K8sCharm(ops.CharmBase):
         node_ips = self._get_node_ips()
         node_name = self.get_node_name()
         cluster_addr = f"{node_ips[0]}:{K8SD_PORT}"
+        node_type = "worker" if self.is_worker else "control-plane"
+        
         log.info("Joining %s(%s) to %s...", self.unit, node_name, cluster_name)
+        
+        # Security audit logging
+        log.info(
+            "SECURITY: Node join initiated [node=%s, cluster=%s, node_type=%s, address=%s]",
+            node_name,
+            cluster_name,
+            node_type,
+            node_ips[0],
+        )
+        
         request = JoinClusterRequest(name=node_name, address=cluster_addr, token=SecretStr(token))
         if self.is_control_plane:
             request.config = ControlPlaneNodeJoinConfig()
@@ -925,8 +957,27 @@ class K8sCharm(ops.CharmBase):
             bootstrap_node_taints = config.bootstrap.node_taints(self)
             config.extra_args.taint_worker(request.config, bootstrap_node_taints)
 
-        self.api_manager.join_cluster(request)
-        log.info("Joined %s(%s)", self.unit, node_name)
+        try:
+            self.api_manager.join_cluster(request)
+            log.info("Joined %s(%s)", self.unit, node_name)
+            
+            # Security audit logging
+            log.info(
+                "SECURITY: Node join completed [node=%s, cluster=%s, node_type=%s]",
+                node_name,
+                cluster_name,
+                node_type,
+            )
+        except Exception as e:
+            # Security audit logging
+            log.error(
+                "SECURITY: Node join failed [node=%s, cluster=%s, node_type=%s, error=%s]",
+                node_name,
+                cluster_name,
+                node_type,
+                str(e),
+            )
+            raise
 
     @on_error(ops.WaitingStatus("Awaiting cluster removal"))
     def _death_handler(self, event: ops.EventBase):
