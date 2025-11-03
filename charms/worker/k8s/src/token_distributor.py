@@ -215,6 +215,7 @@ class TokenManager:
         secret.grant(relation, unit=unit)
 
         # Security audit logging
+        # Note: secret.id is the secret ID (reference), not the actual secret value
         log.info(
             "SECURITY: Granted %s token [secret_id=%s, target_unit=%s, relation=%s]",
             self.strategy.name.lower(),
@@ -247,6 +248,7 @@ class TokenManager:
             secret.remove_all_revisions()
 
             # Security audit logging
+            # Note: juju_secret is the secret ID (reference), not the actual secret value
             log.info(
                 "SECURITY: Revoked %s token [secret_id=%s, unit=%s, relation=%s]",
                 self.strategy.name.lower(),
